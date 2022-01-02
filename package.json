@@ -1,5 +1,5 @@
 {
-  "name": "collab-backend-token-auth",
+  "name": "@cotarr/collab-backend-token-auth",
   "version": "0.0.1",
   "description": "Backend token authorization to demonstrate collab-auth server.",
   "main": "src/index.js",
