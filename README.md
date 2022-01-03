@@ -33,7 +33,7 @@ If you are looking for something more robust try
 # Installation
 
 ```bash
-npm install --save collab-backend-token-auth
+npm install --save @cotarr/collab-backend-token-auth
 ```
 
 # Middleware functions
@@ -114,7 +114,7 @@ The following example combines all of these functions into a single example for 
 in a backend express web server.
 
 ```js
-const { authInit, requireAccessToken, requireScopeForApiRoute, matchScope } = require('collab-backend-token-auth');
+const { authInit, requireAccessToken, requireScopeForApiRoute, matchScope } = require('@cotarr/collab-backend-token-auth');
 
 // On module load, set configuration variables
 authInit({
