@@ -1,6 +1,6 @@
 {
   "name": "collab-backend-token-auth",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Authentication middleware for collab-auth learning demo",
   "main": "src/index.js",
   "scripts": {

@@ -12,7 +12,7 @@ The scope of the project was aimed at authentication for a home network or perso
 [collab-backend-api](https://github.com/cotarr/collab-backend-api) 
 was a mock REST API that was added as part of the collab-auth project 
 to demonstrate the use of access tokens to restrict access to a web API.
-This repository collab-auth-token-auth in intended to used as authentication middleware in the 
+This repository collab-auth-token-auth in intended to be used as authentication middleware in the 
 collab-backend-api mock REST API that is used to demonstrate collab-auth.
 
 The implementation of user, client, and token meta-data is unique to the collab-auth implementation 
@@ -79,11 +79,11 @@ app.use(requireAccessToken({ scope: 'api.write' }));
 app.use(requireAccessToken({ scope: ['api.read', 'api.write'] })); 
 ```
 
-| Property | Type      | Example                                       | Comments                          |
-| -------- | ------    | --------------------------------------------- | --------------------------------- |
-|          | undefined | options = {}                                  | No scope restrictions             |
-| scope    | string    | options = { scope: 'api.write' }              | Require scope must match api.read |
-| scope    | Array     | options = { scope: ['api.read', 'api.read'] } | Both scopes accepted              |
+| Property | Type      | Example                                       | Comments                           |
+| -------- | ------    | --------------------------------------------- | ---------------------------------- |
+|          | undefined | options = {}                                  | No scope restrictions              |
+| scope    | string    | options = { scope: 'api.write' }              | Require scope must match api.write |
+| scope    | Array     | options = { scope: ['api.read', 'api.read'] } | Both scopes accepted               |
 
 ### requireScopeForApiRoute(scope);
 
@@ -95,11 +95,11 @@ Requests with insufficient scope will generate a status 403 Forbidden response.
 Successful requests will call the Express next() function. 
 
 The requireAccessToken() middleware MUST be run prior to requireScopeForApiRoute() function.
-The requireScopeForApiRoute() will accept either a single string or an array of string;
+The requireScopeForApiRoute() will accept either a single string or an array of strings;
 
 ### matchScope(scope)
 
-The `matchScope()` function is a general function that will make a scope determination
+The matchScope() function is a general function that will make a scope determination
 and return a boolean true or false. The requireAccessToken() middleware MUST 
 be run prior to the matchScope() function.
 
