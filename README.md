@@ -1,4 +1,4 @@
-# collab-auth-token-auth
+# collab-backend-token-auth
 
 Authentication middleware for collab-auth learning project.
 
@@ -12,7 +12,7 @@ The scope of the project was aimed at authentication for a home network or perso
 [collab-backend-api](https://github.com/cotarr/collab-backend-api) 
 was a mock REST API that was added as part of the collab-auth project 
 to demonstrate the use of access tokens to restrict access to a web API.
-This repository collab-auth-token-auth in intended to be used as authentication middleware in the 
+This repository collab-backend-token-auth in intended to be used as authentication middleware in the 
 collab-backend-api mock REST API that is used to demonstrate collab-auth.
 
 The implementation of user, client, and token meta-data is unique to the collab-auth implementation 
@@ -32,7 +32,10 @@ If you are looking for something more robust try
 
 # Installation
 
-TBD
+```bash
+npm install --save collab-backend-token-auth
+```
+
 # Middleware functions
 
 ### authInit(options)
@@ -111,7 +114,7 @@ The following example combines all of these functions into a single example for 
 in a backend express web server.
 
 ```js
-const { authInit, requireAccessToken, requireScopeForApiRoute, matchScope } = require('collab-auth-token-auth');
+const { authInit, requireAccessToken, requireScopeForApiRoute, matchScope } = require('collab-backend-token-auth');
 
 // On module load, set configuration variables
 authInit({
