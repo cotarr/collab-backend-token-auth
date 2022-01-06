@@ -4,18 +4,20 @@ Authentication middleware for collab-auth learning project.
 
 ## Description
 
-The project [collab-auth](https://github.com/cotarr/collab-auth) was a learning project. 
+The project [collab-auth](https://github.com/cotarr/collab-auth) was a learning project 
+with documentation [here](https://cotarr.github.io/collab-auth/).
 Collab-auth is a custom Oauth 2.0 server that was coded using 
 [oauth2orize](https://github.com/jaredhanson/oauth2orize).
 The scope of the project was aimed at authentication for a home network or personal server.
 
-[collab-backend-api](https://github.com/cotarr/collab-backend-api) 
+The GitHub repository [collab-backend-api](https://github.com/cotarr/collab-backend-api) 
 was a mock REST API that was added as part of the collab-auth project 
-to demonstrate the use of access tokens to restrict access to a web API.
-This repository collab-backend-token-auth in intended to be used as authentication middleware in the 
-collab-backend-api mock REST API that is used to demonstrate collab-auth.
+to demonstrate the use of Oauth 2.0 access tokens to restrict access to a web API.
 
-The implementation of user, client, and token meta-data is unique to the collab-auth implementation 
+This npm package <b>collab-backend-token-auth</b> is intended to be used as authentication middleware in the 
+collab-backend-api mock REST API.
+
+The implementation of address path names, user, client, and token meta-data is unique to the collab-auth implementation 
 of Oauth 2.0, so it is unlikely this repository could serve as a generic Oauth 2.0 middleware. 
 However, you may find it interesting.
 
@@ -30,20 +32,32 @@ If you are looking for something more robust try
 * No formal code review has been performed.
 * This was intended as a learning project.
 
+## Requirements
+
+- Format of JWT access tokens compatible with [collab-auth](https://github.com/cotarr/collab-auth.git)
+- Developed using Debian 10, Node 14.18.2, Express 4.17.2
+- Other environments not tested (This was a learning project)
+
 # Installation
 
 ```bash
 npm install --save @cotarr/collab-backend-token-auth
 ```
 
+Alternately, this npm module can be installed as a dependency in the context of it's parent API web server
+by cloning the GitHub repository [colab-backend-api](https://github.com/cotarr/collab-backend-api).
+
 # Middleware functions
 
 ### authInit(options)
 
-The authInit() function is used during program load to set module variables.
-Thr client credentials are required to contact the collab-auth authorization server.
+The authInit() function is required to be run during module load to set module configuration variables.
+The URL and client credentials are required to contact the authentication server.
+Care should be taken to avoid disclosure of the client credentials.
 By default, token lookups are cached for 60 seconds. The token cache can be
 disabled by setting tokenCacheSeconds to 0. The cache expire time is configurable.
+
+AuthInit options properties:
 
 | Property               | Type   | Example                 | Need     | Comments                   |
 | ---------------------- | ------ | ----------------------- | -------- | -------------------------- |
@@ -56,7 +70,7 @@ disabled by setting tokenCacheSeconds to 0. The cache expire time is configurabl
 ### requireAccessToken(options);
 
 The requireAccessToken() function is the primary nodejs/express middleware 
-this is used to authorize access. This middleware will parse the http 
+that is used to authorize or deny access. This middleware will parse the http 
 authorization header for a bearer token and extract a JWT access token.
 The token is submitted to the authorization server /oauth/introspect endpoint 
 for validation of the digital signature. User related meta-data is returned. 
@@ -72,7 +86,7 @@ one of the scopes specified in the options object. The scope value may be either
 a sting or an array of strings.  For example:
 
 ```js
-// Require valid access token
+// Require valid access token, but with any scope restrictions
 app.use(requireAccessToken()); 
 
 // Require both valid access token and token scope to match api.write

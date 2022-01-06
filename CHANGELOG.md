@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.1](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.1) - 2022-01-06
+
+### Changed
+
+- index.js - For clarity, changed function names to remove legacy references to passport library.
+- README.md - Update documentation
+
+### Added:
+
+- index.js - In function requireAccessToken(), added check that configuration variables were initialized by running authInit().
+
 ## [v1.0.0](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.0) - 2022-01-03
 
 Initial Commit

@@ -300,7 +300,7 @@ const _saveTokenToCache = (chain) => {
  * @param {Object} chain.introspect - Decoded token metadata
  * @returns {Promise} Resolved with chain object
  */
-const _addTokenScopeToPassportReq = (req, chain) => {
+const _addTokenScopeToReqObject = (req, chain) => {
   if (!req.locals) req.locals = {};
   if ((chain) && (chain.introspect) && (chain.introspect.scope)) {
     req.locals.tokenScope = chain.introspect.scope || [];
@@ -318,7 +318,7 @@ const _addTokenScopeToPassportReq = (req, chain) => {
  * @param {Object} chain.introspect - Decoded token metadata
  * @returns {Promise} Resolved with chain object
  */
-const _addUserIdNumberToPassportReq = (req, chain) => {
+const _addUserIdNumberToReqObject = (req, chain) => {
   if (!req.locals) req.locals = {};
   if ((chain) && (chain.introspect) && (chain.introspect.user) &&
     (chain.introspect.user.number) && (chain.introspect.user.number > 0)) {
@@ -386,6 +386,10 @@ const requireAccessToken = (options) => {
   }
 
   return (req, res, next) => {
+    if ((!authURL) || (!clientId) || (!clientSecret)) {
+      let err = new Error('Module configuration not found. Did you forget in run authInit() ?')
+      return next(err);
+    } 
     // Create a new chain object, to be passed between promises.
     const chainObj = {
       options: opt,
@@ -400,8 +404,8 @@ const requireAccessToken = (options) => {
       .then((chain) => _validateToken(chain))
       .then((chain) => _checkTokenActive(chain))
       .then((chain) => _saveTokenToCache(chain))
-      .then((chain) => _addTokenScopeToPassportReq(req, chain))
-      .then((chain) => _addUserIdNumberToPassportReq(req, chain))
+      .then((chain) => _addTokenScopeToReqObject(req, chain))
+      .then((chain) => _addUserIdNumberToReqObject(req, chain))
       .then((chain) => _restrictByScope(req, chain))
       .then((chain) => { return next(); })
       .catch((err) => {
