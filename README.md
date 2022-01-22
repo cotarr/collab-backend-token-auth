@@ -45,7 +45,7 @@ npm install --save @cotarr/collab-backend-token-auth
 ```
 
 Alternately, this npm module can be installed as a dependency in the context of it's parent API web server
-by cloning the GitHub repository [colab-backend-api](https://github.com/cotarr/collab-backend-api).
+by cloning the GitHub repository [collab-backend-api](https://github.com/cotarr/collab-backend-api).
 
 # Middleware functions
 
