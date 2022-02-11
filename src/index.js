@@ -387,9 +387,9 @@ const requireAccessToken = (options) => {
 
   return (req, res, next) => {
     if ((!authURL) || (!clientId) || (!clientSecret)) {
-      let err = new Error('Module configuration not found. Did you forget in run authInit() ?')
+      const err = new Error('Module configuration not found. Did you forget in run authInit() ?');
       return next(err);
-    } 
+    }
     // Create a new chain object, to be passed between promises.
     const chainObj = {
       options: opt,
