@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Changed
+
+- package.json - Downgrade eslint to 7.32.0 to fix dependency errors. No code changes.
+
 ## [v1.0.4](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.4) - 2022-03-30
 
 ### Changed
