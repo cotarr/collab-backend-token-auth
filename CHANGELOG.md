@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.6](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.6) - 2022-11-15
+
+### Changed
+
+- package-lock.json - Bumped minimatach v3.0.4 to v3.1.2, npm audit fix to address github dependabot alert.
+
 ## [v1.0.5](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.5) - 2022-03-31
 
 ### Changed
