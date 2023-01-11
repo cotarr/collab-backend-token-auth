@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.7](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.7) - 2023-01-11
+
+- Deleted package-lock.json, re-installed eslint and dependencies.
+- package-lock.json - Manually upgrade eslint-plugin-import dependency to debug@4.3.4 to clear dependabot alert.
+
 ## [v1.0.6](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.6) - 2022-11-15
 
 ### Changed
