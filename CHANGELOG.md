@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.8](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.8) - 2023-01-11
+
+The npm security advisory for debug package has been updated to 
+to incorporate backport debug@2.6.9 as safe. Manual edit of package-lock.json is 
+no longer required.
+
+- Deleted package-lock.json. Ran npm install to create a new package-lock.json.
+
 ## [v1.0.7](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.7) - 2023-01-11
 
 - Deleted package-lock.json, re-installed eslint and dependencies.
