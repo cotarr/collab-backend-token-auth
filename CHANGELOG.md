@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.9-dev (Draft) 2023-07-02
+
+Recoded the fetch() function used for authorization server /introspect route.
+These are general changes to make the fetch() function compatible with 
+native fetch() API in NodeJs v18 and later.
+An abort controller was added to the fetch function with supervisory timer.
+In the case of a status not 200 error from the HTTP request to the authorization server,
+the fetch request will now request the text content of the error message from the 
+authorization server for inclusion into the HTTP error response.
+A general code clean up was also done.
+
+- To fix npm audit warning, erase and regenerate package-lock.json in v3 format, reinstall eslint, manually install semver@7.5.3.
+
 ## [v1.0.8](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.8) - 2023-01-11
 
 The npm security advisory for debug package has been updated to 

@@ -185,55 +185,83 @@ const _findCachedToken = (chain) => {
  * @param {string} chain.accessToken - Oauth 2.0 JWT access token
  * @param {Object} chain.introspect - Decoded token metadata
  * @throws Throws error on fetch network request failure
- * @returns {Object} return chain object
+ * @returns {Promise} resolving to chain object.
  */
 const _validateToken = (chain) => {
   // Check for cached token, if valid token from cache, return it.
   if ((chain) && (chain.accessToken) && (chain.introspect) &&
     (chain.introspect.cached) && (chain.introspect.active)) {
     // console.log('validate cached, skipping fetch');
-    return chain;
+    return Promise.resolve(chain);
   } else {
-    // Else, not cached, send access token to authorization server for validation
-    const clientAuth = Buffer.from(clientId + ':' + clientSecret).toString('base64');
-    const body = {
-      access_token: chain.accessToken
-    };
-    const fetchOptions = {
-      method: 'POST',
-      timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: 'Basic ' + clientAuth
-      },
-      body: JSON.stringify(body)
-    };
-    const authServerUrl = authURL + '/oauth/introspect';
-    // Return the Promise
-    return fetch(authServerUrl, fetchOptions)
-      .then((response) => {
-        if (response.ok) {
-          return response.json();
-        } else {
-          if (parseInt(response.status) === 401) {
-            // If access-token not found or invalid, authorization server will return status 401
-            const err = new Error('Auth server returned 401 Unauthorized');
-            err.status = 401;
-            throw err;
+    return new Promise((resolve, reject) => {
+      // Else, not cached, send access token to authorization server for validation
+      const fetchController = new AbortController();
+      const clientAuth = Buffer.from(clientId + ':' + clientSecret).toString('base64');
+      const body = {
+        access_token: chain.accessToken
+      };
+      const fetchOptions = {
+        method: 'POST',
+        redirect: 'error',
+        cache: 'no-store',
+        signal: fetchController.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: 'Basic ' + clientAuth
+        },
+        body: JSON.stringify(body)
+      };
+      const fetchURL = authURL + '/oauth/introspect';
+      // Return the Promise
+      const fetchTimerId = setTimeout(() => fetchController.abort(), 5000);
+      fetch(fetchURL, fetchOptions)
+        .then((response) => {
+          if (response.status === 200) {
+            return response.json();
           } else {
-            // Else, not 401, so this is a fetch error from auth server, will return status 500
-            throw new Error('Fetch status ' + response.status + ' ' +
-            fetchOptions.method + ' ' + authServerUrl);
+            // Retrieve error message from remote web server and pass to error handler
+            return response.text()
+              .then((remoteErrorText) => {
+                const err = new Error('HTTP status error');
+                err.status = response.status;
+                err.statusText = response.statusText;
+                err.remoteErrorText = remoteErrorText;
+                if (response.headers.get('WWW-Authenticate')) {
+                  err.oauthHeaderText = response.headers.get('WWW-Authenticate');
+                }
+                throw err;
+              });
           }
-        }
-      })
-      .then((responseJson) => {
-        // console.log('responseJson ' + JSON.stringify(responseJson, null, 2));
-        chain.introspect = responseJson;
-        return chain;
-      });
-    // Fetch error trapped at end of promise chain
+        })
+        .then((responseJson) => {
+          // console.log('responseJson ' + JSON.stringify(responseJson, null, 2));
+          if (fetchTimerId) clearTimeout(fetchTimerId);
+          chain.introspect = responseJson;
+          resolve(chain);
+        })
+        .catch((err) => {
+          if (fetchTimerId) clearTimeout(fetchTimerId);
+          // Build generic error message to catch network errors
+          let message = ('Fetch error, ' + fetchOptions.method + ' ' + fetchURL + ', ' +
+            (err.message || err.toString() || 'Error'));
+          if (err.status) {
+            // Case of HTTP status error, build descriptive error message
+            message = ('HTTP status error, ') + err.status.toString() + ' ' +
+              err.statusText + ', ' + fetchOptions.method + ' ' + fetchURL;
+          }
+          if (err.remoteErrorText) {
+            message += ', ' + err.remoteErrorText;
+          }
+          if (err.oauthHeaderText) {
+            message += ', ' + err.oauthHeaderText;
+          }
+          const error = new Error(message);
+          error.status = 401;
+          reject(error);
+        });
+    }); // new Promise()
   }
 };
 
@@ -409,26 +437,14 @@ const requireAccessToken = (options) => {
       .then((chain) => _restrictByScope(req, chain))
       .then((chain) => { return next(); })
       .catch((err) => {
-        console.log(err.message);
-        // Case of authorization failures, 401 response
-        if ((err.status) && (err.status === 401)) {
-          // WWW-Authenticate Response Header rfc2617 Section-3.2.1
-          const wwwError =
-            'Bearer error="Unauthorized", error_description="Access token denied"';
-          return res.set('WWW-Authenticate', wwwError)
-            .status(401)
-            .send('Unauthorized');
-        } else if ((err.status) && (err.status === 403)) {
-          // WWW-Authenticate Response Header rfc2617 Section-3.2.1
-          const wwwError =
-            'Bearer error="Forbidden", error_description="Token has insufficient scope"';
-          return res.set('WWW-Authenticate', wwwError)
-            .status(403)
-            .send('Forbidden, Token has insufficient scope');
-        } else {
-          // Else, pass error to nodejs error handler
-          return next(err);
-        }
+        let message = err.message || err.toString() || 'Token authentication error';
+        console.log('Token auth: ' + message);
+        // limit to 1 line
+        message = message.split('\n')[0];
+        // Two choices, 401 or 403
+        let status = 401;
+        if ((err.status) && (err.status === 403)) status = 403;
+        return res.status(status).send(message);
       });
   };
 };
@@ -463,13 +479,9 @@ const requireScopeForApiRoute = (requiredScope) => {
       if (scopeFound) {
         return next();
       } else {
-        // Case where bearer token fail /introspect due to denied client allowedScope
-        // WWW-Authenticate Response Header rfc2617 Section-3.2.1
-        const wwwError =
-          'Bearer error="Forbidden", error_description="Access token insufficient scope"';
-        return res.set('WWW-Authenticate', wwwError)
-          .status(403)
-          .send('Status 403, Forbidden, Access token insufficient scope');
+        const message = 'Token scope: Forbidden, Access token insufficient scope';
+        console.log(message);
+        return res.status(403).send(message);
       }
     } else {
       const err = new Error('Error, Scope not found in request object');
