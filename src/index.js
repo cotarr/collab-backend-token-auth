@@ -4,10 +4,8 @@
 //
 // ------------------------------
 
-const fetch = require('node-fetch');
-
 /**
- *  @type {Array} tokenCache - Array of cached tokens
+ *  @type {Array} tokenCache - Module variable to hold array of cached tokens
  */
 const tokenCache = [];
 
@@ -24,6 +22,65 @@ let clientSecret = null;
 let tokenCacheSeconds = 60;
 /** @type {number} tokenCacheCleanSeconds */
 let tokenCacheCleanSeconds = 300;
+
+/**
+ * Function to be run at program start to initialize module configuration
+ * @example
+ * authInit({
+ *   authURL: 'http://127.0.0.1:3500',
+ *   clientId: 'abc123',
+ *   clientSecret: 'ssh-secret',
+ *   tokenCacheSeconds: 60,
+ *   tokenCacheCleanSeconds: 300
+ * });
+ * @param {Object} optionsObj - Module configuration data
+ * @param {string} optionsObj.authURL - Authorization server URL
+ * @param {string} options.clientId - Client account credentials
+ * @param {string} options.clientSecret - Client account credentials
+ * @param {number} optionsObj.tokenCacheSeconds - User's access token trusted for this time.
+ * @param {number} optionsObj.tokenCacheCleanSeconds - Prune untrusted user's access tokens.
+ * @throws Will throw error for missing arguments
+ */
+const authInit = (options) => {
+  if (options == null) {
+    throw new Error('authInit requires an options object.');
+  }
+  if ((Object.hasOwn(options, 'authURL')) &&
+    (typeof options.authURL === 'string') &&
+    (options.authURL.length > 0)) {
+    authURL = options.authURL;
+  } else {
+    throw new Error('token-check, invalid authURL in options');
+  }
+  if ((Object.hasOwn(options, 'clientId')) &&
+    (typeof options.clientId === 'string') &&
+    (options.clientId.length > 0)) {
+    clientId = options.clientId;
+  } else {
+    throw new Error('token-check, invalid clientId in options');
+  }
+  if ((Object.hasOwn(options, 'clientSecret')) &&
+    (typeof options.clientSecret === 'string') &&
+    (options.clientSecret.length > 0)) {
+    clientSecret = options.clientSecret;
+  } else {
+    throw new Error('token-check, invalid clientSecret in options');
+  }
+  if (Object.hasOwn(options, 'tokenCacheSeconds')) {
+    tokenCacheSeconds = parseInt(options.tokenCacheSeconds);
+  }
+  if (Object.hasOwn(options, 'tokenCacheCleanSeconds')) {
+    tokenCacheCleanSeconds = parseInt(options.tokenCacheCleanSeconds);
+  }
+  // unless token cache is disabled, restart it for first prune cycle
+  if (tokenCacheSeconds !== 0) {
+    setTimeout(_removeExpiredCachedTokens, tokenCacheCleanSeconds * 1000);
+  }
+};
+
+// -------------------------
+// Module Internal Functions
+// -------------------------
 
 /**
  * Remove expired cached tokens (internal timer handler)
@@ -43,60 +100,44 @@ const _removeExpiredCachedTokens = () => {
 };
 
 /**
- * Initialize global variables
- * @param {Object} optionsObj - Module configuration data
- * @param {string} optionsObj.authURL - Authorization server URL
- * @param {string} optionsObj.clientId
- * @param {string} optionsObj.clientSecret
- * @param {number} optionsObj.tokenCacheSeconds
- * @param {number} optionsObj.tokenCacheCleanSeconds
- * @throws Will throw error for missing arguments
+ * Initialize the chain object.
+ * The chain object will be used to hold data as it passes down the promise chain.
+ * @param {Object} options - argument to requireAccessToken(options) authorization
+ * @param {string||string[]} options.scope - Token scope restrictions
+ * @returns {Promise} Resolved with a new chain object
  */
-const authInit = (optionsObj) => {
-  let options = optionsObj;
-  if (options == null) options = {};
-  if (('authURL' in options) &&
-    (typeof options.authURL === 'string') &&
-    (options.authURL.length > 0)) {
-    authURL = options.authURL;
-  } else {
-    throw new Error('token-check, invalid authURL in options');
+const _initChainObject = (options) => {
+  if ((authURL == null) || (clientId == null) || (clientSecret == null)) {
+    const err = new Error('Module configuration not found. Did you forget in run authInit() ?');
+    return Promise.reject(err);
   }
-  if (('clientId' in options) &&
-    (typeof options.clientId === 'string') &&
-    (options.clientId.length > 0)) {
-    clientId = options.clientId;
-  } else {
-    throw new Error('token-check, invalid clientId in options');
+  // Options parser
+  const opt = Object.create(null);
+  if ((options != null) && (Object.hasOwn(options, 'scope'))) {
+    opt.scope = [];
+    if ((typeof options.scope === 'string') && (options.scope.length > 0)) {
+      opt.scope.push(options.scope);
+    } else if ((Array.isArray(options.scope) && options.scope.length > 0)) {
+      options.scope.forEach((scopeString) => {
+        if ((typeof scopeString === 'string') && (scopeString.length > 0)) {
+          opt.scope.push(scopeString);
+        }
+      });
+    }
   }
-  if (('clientSecret' in options) &&
-    (typeof options.clientSecret === 'string') &&
-    (options.clientSecret.length > 0)) {
-    clientSecret = options.clientSecret;
-  } else {
-    throw new Error('token-check, invalid clientSecret in options');
-  }
-  if ('tokenCacheSeconds' in options) {
-    tokenCacheSeconds = parseInt(options.tokenCacheSeconds);
-  }
-  if ('tokenCacheCleanSeconds' in options) {
-    tokenCacheCleanSeconds = parseInt(options.tokenCacheCleanSeconds);
-  }
-  // unless token cache is disabled, restart it for first prune cycle
-  if (tokenCacheSeconds !== 0) {
-    setTimeout(_removeExpiredCachedTokens, tokenCacheCleanSeconds * 1000);
-  }
+  // Create a new chain object, to be passed between promises.
+  const chainObj = Object.create(null);
+  chainObj.options = opt;
+  chainObj.accessToken = null;
+  chainObj.introspect = null;
+  return Promise.resolve(chainObj);
 };
-
-// --------------------
-// Internal Functions
-// --------------------
 
 /**
  * Extract token from http header with input validation
  * @param {Object} req - Node request object
  * @param {Object} chain - chain object passes access token and metadata
- * @param {Object} chain.options
+ * @param {Object} chain.options argument to requireAccessToken(options) authorization
  * @param {string|string[]} chain.options.scope - Token scope restrictions
  * @param {string} chain.accessToken - Oauth 2.0 JWT access token
  * @param {Object} chain.introspect - Decoded token metadata
@@ -104,7 +145,8 @@ const authInit = (optionsObj) => {
  */
 const _extractTokenFromHeader = (req, chain) => {
   if (req.headers) {
-    if (('authorization' in req.headers) && (typeof req.headers.authorization === 'string')) {
+    if ((Object.hasOwn(req.headers, 'authorization')) &&
+      (typeof req.headers.authorization === 'string')) {
       const authHeaderArray = req.headers.authorization.split(' ');
       if ((authHeaderArray.length === 2) &&
         (authHeaderArray[0].toLowerCase() === 'bearer') &&
@@ -132,14 +174,14 @@ const _extractTokenFromHeader = (req, chain) => {
 /**
  * Lookup access token to return cached token meta-data
  * @param {Object} chain - chain object passes access token and metadata
- * @param {Object} chain.options
+ * @param {Object} chain.options argument to requireAccessToken(options) authorization
  * @param {string|string[]} chain.options.scope - Token scope restrictions
  * @param {string} chain.accessToken - Oauth 2.0 JWT access token
  * @param {Object} chain.introspect - Decoded token metadata
  * @returns {Promise} Resolved with chain object
  */
 const _findCachedToken = (chain) => {
-  if ((chain) && (chain.accessToken)) {
+  if ((chain != null) && (Object.hasOwn(chain, 'accessToken'))) {
     // If not cache disabled (seconds = 0), lookup the token
     if (tokenCacheSeconds > 0) {
       const found = tokenCache.find((storedToken) => {
@@ -180,7 +222,7 @@ const _findCachedToken = (chain) => {
 /**
  * Send token to authorization server for validation returning token meta-data
  * @param {Object} chain - chain object passes access token and metadata
- * @param {Object} chain.options
+ * @param {Object} chain.options argument to requireAccessToken(options) authorization
  * @param {string|string[]} chain.options.scope - Token scope restrictions
  * @param {string} chain.accessToken - Oauth 2.0 JWT access token
  * @param {Object} chain.introspect - Decoded token metadata
@@ -188,15 +230,25 @@ const _findCachedToken = (chain) => {
  * @returns {Promise} resolving to chain object.
  */
 const _validateToken = (chain) => {
+  // console.log(JSON.stringify(chain, null, 2));
   // Check for cached token, if valid token from cache, return it.
-  if ((chain) && (chain.accessToken) && (chain.introspect) &&
-    (chain.introspect.cached) && (chain.introspect.active)) {
+  if ((chain != null) &&
+    (Object.hasOwn(chain, 'accessToken')) &&
+    (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+    (Object.hasOwn(chain.introspect, 'cached')) &&
+    (chain.introspect.cached === true) &&
+    (Object.hasOwn(chain.introspect, 'active')) &&
+    (chain.introspect.active === true)) {
     // console.log('validate cached, skipping fetch');
     return Promise.resolve(chain);
   } else {
     return new Promise((resolve, reject) => {
       // Else, not cached, send access token to authorization server for validation
+      //
+      // Network request supervisory timer
       const fetchController = new AbortController();
+      // Authorization server introspect route
+      const fetchURL = authURL + '/oauth/introspect';
       const clientAuth = Buffer.from(clientId + ':' + clientSecret).toString('base64');
       const body = {
         access_token: chain.accessToken
@@ -213,8 +265,6 @@ const _validateToken = (chain) => {
         },
         body: JSON.stringify(body)
       };
-      const fetchURL = authURL + '/oauth/introspect';
-      // Return the Promise
       const fetchTimerId = setTimeout(() => fetchController.abort(), 5000);
       fetch(fetchURL, fetchOptions)
         .then((response) => {
@@ -245,7 +295,7 @@ const _validateToken = (chain) => {
           if (fetchTimerId) clearTimeout(fetchTimerId);
           // Build generic error message to catch network errors
           let message = ('Fetch error, ' + fetchOptions.method + ' ' + fetchURL + ', ' +
-            (err.message || err.toString() || 'Error'));
+            (err.message || err.toString() || 'HTTP Error'));
           if (err.status) {
             // Case of HTTP status error, build descriptive error message
             message = ('HTTP status error, ') + err.status.toString() + ' ' +
@@ -268,19 +318,23 @@ const _validateToken = (chain) => {
 /**
  * Confirm token is active=true, therefore valid
  * @param {Object} chain - chain object passes access token and metadata
- * @param {Object} chain.options
+ * @param {Object} chain.options argument to requireAccessToken(options) authorization
  * @param {string|string[]} chain.options.scope - Token scope restrictions
  * @param {string} chain.accessToken - Oauth 2.0 JWT access token
  * @param {Object} chain.introspect - Decoded token metadata
  * @returns {Promise} Resolved with chain object, or reject with error
  */
 const _checkTokenActive = (chain) => {
-  if ((chain) && (chain.accessToken) && (chain.introspect) &&
-    (chain.introspect.active) && (chain.introspect.client)) {
+  if ((chain != null) &&
+    (Object.hasOwn(chain, 'accessToken')) &&
+    (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+    (Object.hasOwn(chain.introspect, 'active')) &&
+    (chain.introspect.active === true) &&
+    (Object.hasOwn(chain.introspect, 'client'))) {
     // console.log('checkTokenActive successful');
     return Promise.resolve(chain);
   } else {
-    const err = new Error('Error, fetched inactive token');
+    const err = new Error('Error, Token not active.');
     err.status = 401;
     return Promise.reject(err);
   }
@@ -289,7 +343,7 @@ const _checkTokenActive = (chain) => {
 /**
  * Cache token meta-data to service future requests
  * @param {Object} chain - chain object passes access token and metadata
- * @param {Object} chain.options
+ * @param {Object} chain.options argument to requireAccessToken(options) authorization
  * @param {string|string[]} chain.options.scope - Token scope restrictions
  * @param {string} chain.accessToken - Oauth 2.0 JWT access token
  * @param {Object} chain.introspect - Decoded token metadata
@@ -298,7 +352,10 @@ const _checkTokenActive = (chain) => {
 const _saveTokenToCache = (chain) => {
   // If cache enabled (second != 0), and token not previously cached.
   if (tokenCacheSeconds > 0) {
-    if ((chain) && (chain.accessToken) && (chain.introspect) && (!chain.introspect.cached)) {
+    if ((chain != null) &&
+      (Object.hasOwn(chain, 'accessToken')) &&
+      (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+      ((!Object.hasOwn(chain.introspect, 'cached')) || (chain.introspect.cached === false))) {
       // console.log('saving token to tokenCache');
       chain.introspect.cached = true;
       tokenCache.push({
@@ -322,20 +379,27 @@ const _saveTokenToCache = (chain) => {
  * Add token scope to node request object
  * @param {Object} req - Node request object
  * @param {Object} chain - chain object passes access token and metadata
- * @param {Object} chain.options
+ * @param {Object} chain.options argument to requireAccessToken(options) authorization
  * @param {string|string[]} chain.options.scope - Token scope restrictions
  * @param {string} chain.accessToken - Oauth 2.0 JWT access token
  * @param {Object} chain.introspect - Decoded token metadata
  * @returns {Promise} Resolved with chain object
  */
 const _addTokenScopeToReqObject = (req, chain) => {
-  if (!req.locals) req.locals = {};
-  if ((chain) && (chain.introspect) && (chain.introspect.scope)) {
+  if (!Object.hasOwn(req, 'locals')) req.locals = Object.create(null);
+  if ((chain != null) &&
+    (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+    (Object.hasOwn(chain.introspect, 'scope'))) {
     req.locals.tokenScope = chain.introspect.scope || [];
   }
   return Promise.resolve(chain);
 };
 
+//
+// In collab-auth, a user account record contains both an id and number property.
+// allowing database queries to use either uuid or integer type index.
+// user.id      type uuid.v4 (SQL, unique, required, primary index key)
+// user.number  type integer > 0 (alternate user id)
 /**
  * Add token user number to node request object
  * @param {Object} req - Node request object
@@ -347,9 +411,12 @@ const _addTokenScopeToReqObject = (req, chain) => {
  * @returns {Promise} Resolved with chain object
  */
 const _addUserIdNumberToReqObject = (req, chain) => {
-  if (!req.locals) req.locals = {};
-  if ((chain) && (chain.introspect) && (chain.introspect.user) &&
-    (chain.introspect.user.number) && (chain.introspect.user.number > 0)) {
+  if (!Object.hasOwn(req, 'locals')) req.locals = Object.create(null);
+  if ((chain != null) &&
+    (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+    (Object.hasOwn(chain.introspect, 'user')) &&
+    (Object.hasOwn(chain.introspect.user, 'number')) &&
+    (chain.introspect.user.number > 0)) {
     req.locals.userid = parseInt(chain.introspect.user.number);
   }
   return Promise.resolve(chain);
@@ -358,20 +425,33 @@ const _addUserIdNumberToReqObject = (req, chain) => {
 /**
  * Optional: Restrict access based on scope or array of scopes
  * @param {Object} req - Node request object
+ * @param {string[]}} req.locals.scope is array of strings extracted from access token
  * @param {Object} chain - chain object passes access token and metadata
  * @param {Object} chain.options
- * @param {string|string[]} chain.options.scope - Token scope restrictions
+ * @param {string|string[]} chain.options.scope - From requireAccessToken({ scope: 'api.write' })
  * @param {string} chain.accessToken - Oauth 2.0 JWT access token
  * @param {Object} chain.introspect - Decoded token metadata
  * @returns {Promise} Resolved with chain object
  */
 const _restrictByScope = (req, chain) => {
-  if (chain.options.scope) {
+  if ((Object.hasOwn(chain, 'options')) && (chain.options != null) &&
+    (Object.hasOwn(chain.options, 'scope')) &&
+    // may be non-empty array or non-empty string
+    (chain.options.scope.length > 0)) {
     let scopeFound = false;
-    if ((chain.options.scope.length > 0) && (req.locals.tokenScope.length > 0)) {
-      chain.options.scope.forEach((scopeString) => {
-        if (req.locals.tokenScope.indexOf(scopeString) >= 0) scopeFound = true;
-      });
+    if ((Object.hasOwn(req, 'locals')) &&
+      (Object.hasOwn(req.locals, 'tokenScope'))) {
+      // scope requirements from middleware argument requireAccessToken({ scope: 'api.write' })
+      let chainScope = chain.options.scope;
+      // decoded token scopes
+      let reqScope = req.locals.tokenScope;
+      if (typeof chainScope === 'string') chainScope = [chainScope];
+      if (typeof reqScope === 'string') reqScope = [reqScope];
+      if ((chainScope.length > 0) && (reqScope.length > 0)) {
+        chainScope.forEach((scopeString) => {
+          if (reqScope.indexOf(scopeString) >= 0) scopeFound = true;
+        });
+      }
     }
     if (scopeFound) {
       return Promise.resolve(chain);
@@ -381,9 +461,27 @@ const _restrictByScope = (req, chain) => {
       return Promise.reject(err);
     }
   } else {
-    // case of no scope restrictions, accept all
+    // Case of no scope restrictions in middleware requireAccessToken(options)
+    // No options, or options not contain scope, Therefore no restriction, accept all.
     return Promise.resolve(chain);
   }
+};
+
+/**
+ * Inserting this optional debug function into the promise chain
+ * can be used to show progression of data added to the chain object.
+ * @Example
+ *  _initChainObject(options)
+ *    .then((chain) => _extractTokenFromHeader(req, chain))
+ *    .then((chain) => _debugShowChain(chain))  // <--------------------
+ *    .then((chain) => _findCachedToken(chain))
+ * @param   {Object} chain (Optional) - chain object used to pass data between multiple promises.
+ * @returns {Promise} resolves to chain object containing new access token, or rejects error
+*/
+// eslint-disable-next-line no-unused-vars
+const _debugShowChain = (chain) => {
+  console.log(JSON.stringify(chain, null, 2));
+  return Promise.resolve(chain);
 };
 
 /**
@@ -398,36 +496,12 @@ const _restrictByScope = (req, chain) => {
  * @param {string|string[]} options.scope - Scope restrictions
  */
 const requireAccessToken = (options) => {
-  // Options parser
-  const opt = {};
-  if (!(options == null) && ('scope' in options)) {
-    opt.scope = [];
-    if ((typeof options.scope === 'string') && (options.scope.length > 0)) {
-      opt.scope.push(options.scope);
-    } else if ((Array.isArray(options.scope) && options.scope.length > 0)) {
-      options.scope.forEach((scopeString) => {
-        if ((typeof scopeString === 'string') && (scopeString.length > 0)) {
-          opt.scope.push(scopeString);
-        }
-      });
-    }
-  }
-
   return (req, res, next) => {
-    if ((!authURL) || (!clientId) || (!clientSecret)) {
-      const err = new Error('Module configuration not found. Did you forget in run authInit() ?');
-      return next(err);
-    }
-    // Create a new chain object, to be passed between promises.
-    const chainObj = {
-      options: opt,
-      accessToken: null,
-      introspect: null
-    };
     //
     // Chain of asynchronous promises
     //
-    _extractTokenFromHeader(req, chainObj)
+    _initChainObject(options)
+      .then((chain) => _extractTokenFromHeader(req, chain))
       .then((chain) => _findCachedToken(chain))
       .then((chain) => _validateToken(chain))
       .then((chain) => _checkTokenActive(chain))
@@ -435,6 +509,7 @@ const requireAccessToken = (options) => {
       .then((chain) => _addTokenScopeToReqObject(req, chain))
       .then((chain) => _addUserIdNumberToReqObject(req, chain))
       .then((chain) => _restrictByScope(req, chain))
+      // .then((chain) => _debugShowChain(chain))
       .then((chain) => { return next(); })
       .catch((err) => {
         let message = err.message || err.toString() || 'Token authentication error';
@@ -452,8 +527,11 @@ const requireAccessToken = (options) => {
 /**
  * Middleware to enforce route specific token scope restrictions
  * @param   {string|string[]} requiredScope - Scope values that will be accepted
+ * Scope value comes from middleware requireScopeForApiRoute(['api.write']).
  * @example
  * // Require scope for route (requireAccessToken() called previously)
+ * app.get('/v1, requireAccessToken(), ... )
+ * // requireScopeForApiRoute uses tokens scope extracted in requireAccessToken()
  * router.get('/v1/someRoute',
  *   requireScopeForApiRoute(['api.read', 'api.write', 'api.admin']),
  *   validations.list, controller.list);
@@ -471,7 +549,8 @@ const requireScopeForApiRoute = (requiredScope) => {
   // Return Express middleware function.
   return (req, res, next) => {
     let scopeFound = false;
-    if ((req.locals) && (req.locals.tokenScope) &&
+    if ((Object.hasOwn(req, 'locals')) &&
+      (Object.hasOwn(req.locals, 'tokenScope')) &&
       (Array.isArray(req.locals.tokenScope))) {
       requiredScope.forEach((scopeString) => {
         if (req.locals.tokenScope.indexOf(scopeString) >= 0) scopeFound = true;
@@ -484,7 +563,7 @@ const requireScopeForApiRoute = (requiredScope) => {
         return res.status(403).send(message);
       }
     } else {
-      const err = new Error('Error, Scope not found in request object');
+      const err = new Error('Error, Tokens scope not found in request object');
       return next(err);
     }
   };
@@ -511,7 +590,8 @@ const matchScope = (req, requiredScope) => {
     requiredScope = [requiredScope];
   }
   let scopeFound = false;
-  if ((req.locals) && (req.locals.tokenScope) &&
+  if ((Object.hasOwn(req, 'locals')) &&
+    (Object.hasOwn(req.locals, 'tokenScope')) &&
     (Array.isArray(req.locals.tokenScope))) {
     requiredScope.forEach((scopeString) => {
       if (req.locals.tokenScope.indexOf(scopeString) >= 0) scopeFound = true;

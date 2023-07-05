@@ -1,6 +1,10 @@
 {
   "name": "@cotarr/collab-backend-token-auth",
-  "version": "1.0.9-dev",
+  "version": "2.0.0-dev",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
   "description": "Authentication middleware for collab-auth learning demo",
   "main": "src/index.js",
   "scripts": {
@@ -18,7 +22,6 @@
   },
   "homepage": "https://github.com/cotarr/collab-backend-token-auth#readme",
   "dependencies": {
-    "node-fetch": "^2.6.7"
   },
   "devDependencies": {
     "eslint": "^8.44.0",

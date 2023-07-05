@@ -34,11 +34,14 @@ If you are looking for something more robust try
 
 ## Requirements
 
+- Requires Node Version 18 or greater
 - Format of JWT access tokens compatible with [collab-auth](https://github.com/cotarr/collab-auth.git)
-- Developed using Debian 10, Node 14.18.2, Express 4.17.2
+- Developed using Debian 11, Node 18, Express 4.18.2
 - Other environments not tested (This was a learning project)
 
 # Installation
+
+Require Node version 18 or greater
 
 ```bash
 npm install --save @cotarr/collab-backend-token-auth
@@ -142,6 +145,11 @@ app.get('/hello', requireAccessToken(), (req, res) => { res.send('Hello World');
 
 // All routes beyond this point require authorization
 app.use(requireAccessToken());
+
+// All routes beyond this point require valid Oauth2 token AND scope api.write
+app.use(requireAccessToken({ scope: 'api.write' }));
+// Multiple scopes are allowed as array of strings
+app.use(requireAccessToken({ scope: ['api.read', 'api.write'] }));
 
 // The route /test requires either api.read or api.write
 // but will return different content based on scope.

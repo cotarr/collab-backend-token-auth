@@ -6,18 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.0.9-dev (Draft) 2023-07-02
+## v2.0.0-dev (Draft) 2023-07-02
+
+BREAKING CHANGE (since v0.0.8) require Node 18 or greater. Increment major version from 1 to 2
+
+Upgrade to node 18 allows use of native NodeJS fetch() API. 
+Without node-fetch, the collab-backend-token-auth now has no NPM production dependencies.
+The node-fetch repository used previously has moved on. The current 
+version 3 of node-fetch is an ES Module that does not support CommonJS modules.
+Use of the internal node fetch API removes reliance of the legacy node-fetch v2 dependency.
 
 Recoded the fetch() function used for authorization server /introspect route.
-These are general changes to make the fetch() function compatible with 
+These are changes to make the fetch() function compatible with 
 native fetch() API in NodeJs v18 and later.
 An abort controller was added to the fetch function with supervisory timer.
 In the case of a status not 200 error from the HTTP request to the authorization server,
 the fetch request will now request the text content of the error message from the 
 authorization server for inclusion into the HTTP error response.
-A general code clean up was also done.
 
-- To fix npm audit warning, erase and regenerate package-lock.json in v3 format, reinstall eslint, manually install semver@7.5.3.
+- Set minimum version NodeJs to node 18 or greater, added node version check in config/index.js.
+- In package.json set type: "commonjs"
+- General overall code clean up and improve comments.
+- In code, now using Object.hasOwn to test if keys properties exist in an object, replacing `in` operator, or boolean check on key name.
+- In various places, create new objects with Object.create(null), replacing object literal.
+- To fix npm audit warning with eslint, erase and regenerate package-lock.json in v3 format, reinstall eslint, manually install semver@7.5.3.
 
 ## [v1.0.8](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v1.0.8) - 2023-01-11
 
