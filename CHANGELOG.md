@@ -20,7 +20,7 @@ Having dropped node-fetch, the collab-backend-token-auth now has zero NPM produc
 The node-fetch repository used previously has moved on. The current 
 version 3 of node-fetch is an ES Module that does not support CommonJS modules.
 
-Recoded the fetch() function used for authorization server /introspect route.
+Recoded the fetch() function used for authorization server /oauth/introspect route.
 An abort controller was added to the fetch function with supervisory timer.
 In the case of a status not 200 error from the HTTP request to the authorization server,
 the fetch request will now request the text content of the error message from the 

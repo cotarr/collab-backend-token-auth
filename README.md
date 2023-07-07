@@ -41,6 +41,32 @@ If you are looking for something more robust try
 - Developed using Debian 11, Node 18, Express 4.18.2
 - Other environments not tested (This was a learning project)
 
+# Token Validation
+
+Access tokens are validated by submitting the tokens to the authorization server's /oauth/introspect 
+endpoint. If the token validation succeeds, the token's meta-data is returned. If the token 
+is authorized, the next() handler is called to enable further processing of the authorized request.
+If token validation fails, a status 401 Unauthorized response is returned.
+
+A web page may submit multiple API queries in a short period of time.
+This could result in a series of redundant token validation submissions to the authorization server.
+The program includes a token cache that stores the authorization server meta-data response to a token's
+validation request. When each new HTTP request arrives, the cache is searched for a match to the 
+incoming access token. Cached token meta-data which has not exceeded the tokens expiration 
+times as set by the authorization server, and concurrently the cache entry has not exceeded 
+the collab-backend-token-auth configuration property "tokenCacheSeconds", 
+then the cached token would be trusted implicitly without submission to the authorization server.
+
+The token cache can be disabled by setting tokenCacheSeconds=0. The configuration property 
+"tokenCacheCleanSeconds" controls a timer that will remove invalid tokens from the cache, including 
+token which are expired, or tokens which have been in the cache past the tokenCacheSeconds limit.
+
+# Credentials
+
+The collab-backend-token-auth middleware requires an Oauth2 client account to grant access 
+to the Oauth2 authorization server in order to submit tokens for validation. 
+This consists of clientId and clientSecret values.
+
 # Installation
 
 Require Node version 18 or greater
@@ -59,10 +85,7 @@ by cloning the GitHub repository [collab-backend-api](https://github.com/cotarr/
 The authInit() function is required to be run during module load to set module configuration variables.
 The URL and client credentials are required to contact the authentication server.
 Care should be taken to avoid disclosure of the client credentials.
-By default, token lookups are cached for 60 seconds. The token cache can be
-disabled by setting tokenCacheSeconds to 0. The cache expire time is configurable.
-
-AuthInit options properties:
+The token cache can be disabled by setting tokenCacheSeconds=0.
 
 | Property               | Type   | Example                 | Need     | Comments                   |
 | ---------------------- | ------ | ----------------------- | -------- | -------------------------- |
