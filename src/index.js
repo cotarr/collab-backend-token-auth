@@ -41,7 +41,7 @@ let tokenCacheCleanSeconds = 300;
  * @param {number} optionsObj.tokenCacheCleanSeconds - Prune untrusted user's access tokens.
  * @throws Will throw error for missing arguments
  */
-const authInit = (options) => {
+exports.authInit = (options) => {
   if (options == null) {
     throw new Error('authInit requires an options object.');
   }
@@ -89,6 +89,7 @@ const _removeExpiredCachedTokens = () => {
   if (tokenCache.length > 0) {
     for (let i = tokenCache.length - 1; i >= 0; i--) {
       if ((tokenCache[i].introspect.exp < Math.floor(Date.now() / 1000)) ||
+        // Time as javascript Date object
         (tokenCache[i].cacheExpires < new Date())) {
         // console.log('Removing expired token at ' + i.toString());
         tokenCache.splice(i, 1);
@@ -181,7 +182,8 @@ const _extractTokenFromHeader = (req, chain) => {
  * @returns {Promise} Resolved with chain object
  */
 const _findCachedToken = (chain) => {
-  if ((chain != null) && (Object.hasOwn(chain, 'accessToken'))) {
+  if ((chain != null) &&
+    (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null)) {
     // If not cache disabled (seconds = 0), lookup the token
     if (tokenCacheSeconds > 0) {
       const found = tokenCache.find((storedToken) => {
@@ -190,9 +192,9 @@ const _findCachedToken = (chain) => {
           (storedToken.token === chain.accessToken) &&
           // Token is "active" state from auth server
           (storedToken.introspect.active) &&
-          // Access-token not expired
+          // Access-token not expired (unix time in seconds)
           (storedToken.introspect.exp > Math.floor(Date.now() / 1000)) &&
-          // Cache entry not expired
+          // Cache entry not expired (Time as javascript Date object)
           (storedToken.cacheExpires > new Date())
         );
       });
@@ -231,9 +233,10 @@ const _findCachedToken = (chain) => {
  */
 const _validateToken = (chain) => {
   // console.log(JSON.stringify(chain, null, 2));
+  // Unexpired tokens in cache are assumed to be valid.
   // Check for cached token, if valid token from cache, return it.
   if ((chain != null) &&
-    (Object.hasOwn(chain, 'accessToken')) &&
+    (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null) &&
     (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
     (Object.hasOwn(chain.introspect, 'cached')) &&
     (chain.introspect.cached === true) &&
@@ -326,7 +329,7 @@ const _validateToken = (chain) => {
  */
 const _checkTokenActive = (chain) => {
   if ((chain != null) &&
-    (Object.hasOwn(chain, 'accessToken')) &&
+    (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null) &&
     (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
     (Object.hasOwn(chain.introspect, 'active')) &&
     (chain.introspect.active === true) &&
@@ -353,7 +356,7 @@ const _saveTokenToCache = (chain) => {
   // If cache enabled (second != 0), and token not previously cached.
   if (tokenCacheSeconds > 0) {
     if ((chain != null) &&
-      (Object.hasOwn(chain, 'accessToken')) &&
+      (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null) &&
       (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
       ((!Object.hasOwn(chain.introspect, 'cached')) || (chain.introspect.cached === false))) {
       // console.log('saving token to tokenCache');
@@ -361,6 +364,7 @@ const _saveTokenToCache = (chain) => {
       tokenCache.push({
         token: chain.accessToken,
         introspect: chain.introspect,
+        // Time as javascript Date object
         cacheExpires: new Date(Date.now() + (tokenCacheSeconds * 1000))
       });
       // console.log('Token saved to cache');
@@ -377,6 +381,17 @@ const _saveTokenToCache = (chain) => {
 
 /**
  * Add token scope to node request object
+ * Purpose:
+ * During initial authorization check by requireAccessToken()
+ * the token's scope is saved to the req object is to enable
+ * middleware functions requireScopeForApiRoute() and matchScope()
+ * to evaluate route specific scopes, to occur later in the request evaluation.
+ * example:
+ *   req.locals {
+ *     tokenScope: [
+ *       api.write
+ *     ]
+ *   }
  * @param {Object} req - Node request object
  * @param {Object} chain - chain object passes access token and metadata
  * @param {Object} chain.options argument to requireAccessToken(options) authorization
@@ -396,12 +411,21 @@ const _addTokenScopeToReqObject = (req, chain) => {
 };
 
 //
-// In collab-auth, a user account record contains both an id and number property.
-// allowing database queries to use either uuid or integer type index.
-// user.id      type uuid.v4 (SQL, unique, required, primary index key)
-// user.number  type integer > 0 (alternate user id)
 /**
- * Add token user number to node request object
+ * Add user id and user number to node request object
+ * Purpose:
+ * 1) Optional custom backend code to restrict route access by user ID (read only own data)
+ * 2) Optional custom backend code to perform database queries specific to an authorized user.
+ * user.id:     type uuid.v4 (SQL, unique, required, primary index key)
+ * user.number: type integer > 0 (alternate integer user id is available)
+ * example:
+ *   req.locals {
+ *     user: {
+ *       number: 1,
+ *       id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+ *     },
+ *     userid: 1
+ *   }
  * @param {Object} req - Node request object
  * @param {Object} chain - chain object passes access token and metadata
  * @param {Object} chain.options
@@ -410,14 +434,25 @@ const _addTokenScopeToReqObject = (req, chain) => {
  * @param {Object} chain.introspect - Decoded token metadata
  * @returns {Promise} Resolved with chain object
  */
-const _addUserIdNumberToReqObject = (req, chain) => {
+const _addUserIdToReqObject = (req, chain) => {
   if (!Object.hasOwn(req, 'locals')) req.locals = Object.create(null);
   if ((chain != null) &&
-    (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
-    (Object.hasOwn(chain.introspect, 'user')) &&
-    (Object.hasOwn(chain.introspect.user, 'number')) &&
+  (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+  (Object.hasOwn(chain.introspect, 'user'))) {
+    if ((Object.hasOwn(chain.introspect.user, 'number')) &&
+    (chain.introspect.user.number != null) &&
     (chain.introspect.user.number > 0)) {
-    req.locals.userid = parseInt(chain.introspect.user.number);
+      if (!Object.hasOwn(req.locals, 'user')) req.locals.user = Object.create(null);
+      req.locals.user.number = parseInt(chain.introspect.user.number);
+      // Legacy property, in future req.locals.userid may be dropped
+      // Please use req.locals.user.number
+      req.locals.userid = parseInt(chain.introspect.user.number);
+    }
+    if ((Object.hasOwn(chain.introspect.user, 'id')) &&
+      (chain.introspect.user.id.length > 0)) {
+      if (!Object.hasOwn(req.locals, 'user')) req.locals.user = Object.create(null);
+      req.locals.user.id = chain.introspect.user.id;
+    }
   }
   return Promise.resolve(chain);
 };
@@ -479,8 +514,9 @@ const _restrictByScope = (req, chain) => {
  * @returns {Promise} resolves to chain object containing new access token, or rejects error
 */
 // eslint-disable-next-line no-unused-vars
-const _debugShowChain = (chain) => {
-  console.log(JSON.stringify(chain, null, 2));
+const _debugShowChain = (req, chain) => {
+  console.log('chain', JSON.stringify(chain, null, 2));
+  console.log('req.locals', JSON.stringify(req.locals, null, 2));
   return Promise.resolve(chain);
 };
 
@@ -495,7 +531,7 @@ const _debugShowChain = (chain) => {
  * @param {Object} options
  * @param {string|string[]} options.scope - Scope restrictions
  */
-const requireAccessToken = (options) => {
+exports.requireAccessToken = (options) => {
   return (req, res, next) => {
     //
     // Chain of asynchronous promises
@@ -507,9 +543,9 @@ const requireAccessToken = (options) => {
       .then((chain) => _checkTokenActive(chain))
       .then((chain) => _saveTokenToCache(chain))
       .then((chain) => _addTokenScopeToReqObject(req, chain))
-      .then((chain) => _addUserIdNumberToReqObject(req, chain))
+      .then((chain) => _addUserIdToReqObject(req, chain))
       .then((chain) => _restrictByScope(req, chain))
-      // .then((chain) => _debugShowChain(chain))
+      // .then((chain) => _debugShowChain(req, chain))
       .then((chain) => { return next(); })
       .catch((err) => {
         let message = err.message || err.toString() || 'Token authentication error';
@@ -537,7 +573,7 @@ const requireAccessToken = (options) => {
  *   validations.list, controller.list);
  * @throws Throws error on missing argument
  **/
-const requireScopeForApiRoute = (requiredScope) => {
+exports.requireScopeForApiRoute = (requiredScope) => {
   if ((requiredScope == null) ||
     ((typeof requiredScope !== 'string') &&
     (!Array.isArray(requiredScope)))) {
@@ -580,7 +616,7 @@ const requireScopeForApiRoute = (requiredScope) => {
  * @throws Throws error on missing argument
  * @returns {boolean} return true if scope in list, otherwise return false
  */
-const matchScope = (req, requiredScope) => {
+exports.matchScope = (req, requiredScope) => {
   if ((requiredScope == null) ||
     ((typeof requiredScope !== 'string') &&
     (!Array.isArray(requiredScope)))) {
@@ -601,11 +637,4 @@ const matchScope = (req, requiredScope) => {
   }
   // return result as boolean
   return scopeFound;
-};
-
-module.exports = {
-  authInit,
-  requireAccessToken,
-  requireScopeForApiRoute,
-  matchScope
 };

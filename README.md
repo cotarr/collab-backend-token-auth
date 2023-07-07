@@ -17,6 +17,8 @@ to demonstrate the use of Oauth 2.0 access tokens to restrict access to a web AP
 This npm package <b>collab-backend-token-auth</b> is intended to be used as authentication middleware in the 
 collab-backend-api mock REST API.
 
+This package has zero NPM dependencies.
+
 The implementation of address path names, user, client, and token meta-data is unique to the collab-auth implementation 
 of Oauth 2.0, so it is unlikely this repository could serve as a generic Oauth 2.0 middleware. 
 However, you may find it interesting.
@@ -104,6 +106,27 @@ app.use(requireAccessToken({ scope: ['api.read', 'api.write'] }));
 |          | undefined | options = {}                                  | No scope restrictions              |
 | scope    | string    | options = { scope: 'api.write' }              | Require scope must match api.write |
 | scope    | Array     | options = { scope: ['api.read', 'api.read'] } | Both scopes accepted               |
+
+The requireAccessToken() middleware also inserts the token's scope 
+and the token's user ID information to the request object.
+This allows optional custom backend code to restrict route 
+access by matching user ID value or user scope value. 
+This allows optional custom backend code to perform database 
+queries specific to a user login. The user data does not apply to device or 
+machine tokens obtained with client credentials grant, as they 
+have no user information.
+
+```
+req.locals {
+  "tokenScope": [
+    "api.write"
+  ],
+  "user": {
+    "number": 1,
+    "id": "05d3649f-2bdc-4e0e-aaf7-848dd1516ca0"
+  }
+}
+```
 
 ### requireScopeForApiRoute(scope);
 

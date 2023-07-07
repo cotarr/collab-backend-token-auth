@@ -21,6 +21,9 @@
     "url": "https://github.com/cotarr/collab-backend-token-auth/issues"
   },
   "homepage": "https://github.com/cotarr/collab-backend-token-auth#readme",
+  "keywords": [
+    "oauth2-client"
+  ],
   "dependencies": {
   },
   "devDependencies": {
