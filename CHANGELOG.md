@@ -8,13 +8,17 @@ and this project adheres to
 
 ## v2.0.0-dev (Draft) 2023-07-07
 
+### BREAKING CHANGE (Node>=18)
+
 BREAKING CHANGE (after v0.0.8) require Node 18 or greater. Incremented major version from 1 to 2
 
-Upgrade to node 18 allows use of native NodeJS fetch() API. 
+- Added engine.node>=18 in package.json
+- Added node version check in config/index.js for Node>=18
+
+Upgrade to node 18 allows use of native NodeJS fetch() API for network requests.
 Having dropped node-fetch, the collab-backend-token-auth now has zero NPM production dependencies.
 The node-fetch repository used previously has moved on. The current 
 version 3 of node-fetch is an ES Module that does not support CommonJS modules.
-Use of the internal node fetch API removes reliance of the legacy node-fetch v2 dependency.
 
 Recoded the fetch() function used for authorization server /introspect route.
 An abort controller was added to the fetch function with supervisory timer.
@@ -22,14 +26,22 @@ In the case of a status not 200 error from the HTTP request to the authorization
 the fetch request will now request the text content of the error message from the 
 authorization server for inclusion into the HTTP error response.
 
-- Set minimum version NodeJs to node 18 or greater, added node version check in config/index.js.
+### Added (timing safe compare)
+
+Added a timing safe compare to the function that searches for previously cached tokens 
+in the token cache. This is to reduce risk of a timing attack trying to match 
+a previously cached access token character by character.
+Cached tokens that have not expired are trusted.
+
+### Changed (Misc)
+
+- When extracting access token from header, verify token is is type 'string' and length greater than 16 and less than 4096.
 - In package.json set type: "commonjs"
-- General overall code clean up and improve comments.
-- In code, now using Object.hasOwn to test if keys properties exist in an object, replacing `in` operator, or boolean check on key name.
+- In code, now using Object.hasOwn to test if properties exist in an object, replacing `in` operator, or boolean check on key name.
 - In various places, create new objects with Object.create(null), replacing object literal.
 - To fix npm audit warning with eslint, erase and regenerate package-lock.json in v3 format, reinstall eslint, manually install semver@7.5.3.
 
-Additions to local data in request object.
+### Added (req.locals.user)
 
 In the case where user user tokens are submitted, the user id is added to the request object.
 This allows optional custom backend code to restrict route access by user ID login.

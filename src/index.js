@@ -4,10 +4,43 @@
 //
 // ------------------------------
 
+const crypto = require('node:crypto');
+
 /**
- *  @type {Array} tokenCache - Module variable to hold array of cached tokens
+ * Example cache:
+ * [
+ *   {
+ *     token: "xxxxxxx.xxxxxxx.xxxxxxx",
+ *     introspect: {
+ *        ... token metadata ...
+ *     },
+ *     cacheExpires: "2023-07-07T17:31:35.057Z"
+ *   },
+ *   {
+ *      ... more tokens ...
+ *   }
+ * ]
+ * @type {Array} tokenCache - Module variable to hold array of cached tokens
  */
 const tokenCache = [];
+
+/**
+ * Remove expired cached tokens (internal timer handler)
+ */
+const _removeExpiredCachedTokens = () => {
+  if (tokenCache.length > 0) {
+    for (let i = tokenCache.length - 1; i >= 0; i--) {
+      if ((tokenCache[i].introspect.exp < Math.floor(Date.now() / 1000)) ||
+        // Time as javascript Date object
+        (tokenCache[i].cacheExpires < new Date())) {
+        // console.log('Removing expired token at ' + i.toString());
+        tokenCache.splice(i, 1);
+      }
+    }
+  }
+  // At startup called first time in authInit();
+  setTimeout(_removeExpiredCachedTokens, tokenCacheCleanSeconds * 1000);
+};
 
 // ------------------------
 // Module Configuration
@@ -83,24 +116,6 @@ exports.authInit = (options) => {
 // -------------------------
 
 /**
- * Remove expired cached tokens (internal timer handler)
- */
-const _removeExpiredCachedTokens = () => {
-  if (tokenCache.length > 0) {
-    for (let i = tokenCache.length - 1; i >= 0; i--) {
-      if ((tokenCache[i].introspect.exp < Math.floor(Date.now() / 1000)) ||
-        // Time as javascript Date object
-        (tokenCache[i].cacheExpires < new Date())) {
-        // console.log('Removing expired token at ' + i.toString());
-        tokenCache.splice(i, 1);
-      }
-    }
-  }
-  // At startup called first time in authInit();
-  setTimeout(_removeExpiredCachedTokens, tokenCacheCleanSeconds * 1000);
-};
-
-/**
  * Initialize the chain object.
  * The chain object will be used to hold data as it passes down the promise chain.
  * @param {Object} options - argument to requireAccessToken(options) authorization
@@ -154,8 +169,17 @@ const _extractTokenFromHeader = (req, chain) => {
         (authHeaderArray[1].length > 0) &&
         // JWT token "xxxxxx.xxxxxx.xxxxx"
         (authHeaderArray[1].split('.').length === 3)) {
-        chain.accessToken = authHeaderArray[1];
-        return Promise.resolve(chain);
+        // Typical collab-auth token string length 547 bytes
+        if ((typeof authHeaderArray[1] === 'string') &&
+          (authHeaderArray[1].length > 16) && (authHeaderArray[1].length < 4096)) {
+          // Input validation succeeded, add Bearer token to chain object
+          chain.accessToken = authHeaderArray[1];
+          return Promise.resolve(chain);
+        } else {
+          const err = new Error('Invalid Bearer token length');
+          err.status = 401;
+          return Promise.reject(err);
+        }
       } else {
         const err = new Error('Expected Bearer token');
         err.status = 401;
@@ -170,6 +194,22 @@ const _extractTokenFromHeader = (req, chain) => {
     const err = new Error('Headers not found in req object');
     return Promise.reject(err);
   }
+};
+/**
+ * Timing safe compare for two access tokens
+ * @param   {String} token1 - Access token
+ * @param   {String} token2 - Access token
+ * @returns {Boolean} Return true if successful match, else false
+ */
+const safeCompare = function (token1, token2) {
+  const token1Length = Buffer.byteLength(token1, 'utf8');
+  const token2Length = Buffer.byteLength(token2, 'utf8');
+  const bufferLength = (token1Length > token2Length) ? token1Length : token2Length;
+  const token1Buffer = Buffer.alloc(bufferLength);
+  const token2Buffer = Buffer.alloc(bufferLength);
+  token1Buffer.write(token1, 'utf8');
+  token2Buffer.write(token2, 'utf8');
+  return crypto.timingSafeEqual(token1Buffer, token2Buffer);
 };
 
 /**
@@ -189,7 +229,7 @@ const _findCachedToken = (chain) => {
       const found = tokenCache.find((storedToken) => {
         return (
           // storedToken is found
-          (storedToken.token === chain.accessToken) &&
+          (safeCompare(storedToken.token, chain.accessToken)) &&
           // Token is "active" state from auth server
           (storedToken.introspect.active) &&
           // Access-token not expired (unix time in seconds)
@@ -202,6 +242,7 @@ const _findCachedToken = (chain) => {
         // console.log('Access token found in tokenCache');
         // found, return authorization metadata
         chain.introspect = found.introspect;
+        chain.introspectWasCached = true;
         return Promise.resolve(chain);
       } else {
         // console.log('Access token not found in tokenCache');
@@ -236,13 +277,13 @@ const _validateToken = (chain) => {
   // Unexpired tokens in cache are assumed to be valid.
   // Check for cached token, if valid token from cache, return it.
   if ((chain != null) &&
-    (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null) &&
-    (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
-    (Object.hasOwn(chain.introspect, 'cached')) &&
-    (chain.introspect.cached === true) &&
-    (Object.hasOwn(chain.introspect, 'active')) &&
-    (chain.introspect.active === true)) {
+    (Object.hasOwn(chain, 'accessToken')) &&
+    (chain.accessToken != null) && (chain.accessToken.length > 0) &&
+    (Object.hasOwn(chain, 'introspectWasCached')) && (chain.introspectWasCached === true) &&
+    (Object.hasOwn(chain, 'introspect')) &&
+    (Object.hasOwn(chain.introspect, 'active')) && (chain.introspect.active === true)) {
     // console.log('validate cached, skipping fetch');
+    // Cached tokens that are not expired are trusted implicitly
     return Promise.resolve(chain);
   } else {
     return new Promise((resolve, reject) => {
@@ -291,6 +332,7 @@ const _validateToken = (chain) => {
         .then((responseJson) => {
           // console.log('responseJson ' + JSON.stringify(responseJson, null, 2));
           if (fetchTimerId) clearTimeout(fetchTimerId);
+          // Save token meta-data. It's contents validated in the next function call.
           chain.introspect = responseJson;
           resolve(chain);
         })
@@ -358,7 +400,7 @@ const _saveTokenToCache = (chain) => {
     if ((chain != null) &&
       (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null) &&
       (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
-      ((!Object.hasOwn(chain.introspect, 'cached')) || (chain.introspect.cached === false))) {
+      ((!Object.hasOwn(chain, 'introspectWasCached')))) {
       // console.log('saving token to tokenCache');
       chain.introspect.cached = true;
       tokenCache.push({
@@ -449,6 +491,7 @@ const _addUserIdToReqObject = (req, chain) => {
       req.locals.userid = parseInt(chain.introspect.user.number);
     }
     if ((Object.hasOwn(chain.introspect.user, 'id')) &&
+      (chain.introspect.user.id != null) &&
       (chain.introspect.user.id.length > 0)) {
       if (!Object.hasOwn(req.locals, 'user')) req.locals.user = Object.create(null);
       req.locals.user.id = chain.introspect.user.id;
