@@ -13,18 +13,15 @@ and this project adheres to
 BREAKING CHANGE (after v0.0.8) require Node 18 or greater. Incremented major version from 1 to 2
 
 - Added engine.node>=18 in package.json
-- Added node version check in config/index.js for Node>=18
 
 Upgrade to node 18 allows use of native NodeJS fetch() API for network requests.
 Having dropped node-fetch, the collab-backend-token-auth now has zero NPM production dependencies.
 The node-fetch repository used previously has moved on. The current 
 version 3 of node-fetch is an ES Module that does not support CommonJS modules.
 
-Recoded the fetch() function used for authorization server /oauth/introspect route.
-An abort controller was added to the fetch function with supervisory timer.
-In the case of a status not 200 error from the HTTP request to the authorization server,
-the fetch request will now request the text content of the error message from the 
-authorization server for inclusion into the HTTP error response.
+- Recoded the fetch() function used for the authorization server /oauth/introspect route.
+- An abort controller was added to the fetch function with supervisory timer.
+- In the case of a status not 200 error from the HTTP request to the authorization server, the fetch request will now request the text content of the error message from the authorization server for inclusion into the HTTP error response.
 
 ### Added (timing safe compare)
 

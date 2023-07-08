@@ -117,7 +117,7 @@ exports.authInit = (options) => {
 
 /**
  * Initialize the chain object.
- * The chain object will be used to hold data as it passes down the promise chain.
+ * The chain object will be used to hold state related data as it passes down the promise chain.
  * @param {Object} options - argument to requireAccessToken(options) authorization
  * @param {string||string[]} options.scope - Token scope restrictions
  * @returns {Promise} Resolved with a new chain object
@@ -265,6 +265,8 @@ const _findCachedToken = (chain) => {
 
 /**
  * Send token to authorization server for validation returning token meta-data
+ * If a trusted token exists in the cache, the token is trusted implicitly
+ * without sending the token to the authorization server.
  * @param {Object} chain - chain object passes access token and metadata
  * @param {Object} chain.options argument to requireAccessToken(options) authorization
  * @param {string|string[]} chain.options.scope - Token scope restrictions
@@ -403,7 +405,6 @@ const _saveTokenToCache = (chain) => {
       (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
       ((!Object.hasOwn(chain, 'introspectWasCached')))) {
       // console.log('saving token to tokenCache');
-      chain.introspect.cached = true;
       tokenCache.push({
         token: chain.accessToken,
         introspect: chain.introspect,

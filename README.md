@@ -14,7 +14,7 @@ The GitHub repository [collab-backend-api](https://github.com/cotarr/collab-back
 was a mock REST API that was added as part of the collab-auth project 
 to demonstrate the use of Oauth 2.0 access tokens to restrict access to a web API.
 
-This npm package <b>collab-backend-token-auth</b> is intended to be used as authentication middleware in the 
+This npm package **collab-backend-token-auth** is intended to be used as authentication middleware in the 
 collab-backend-api mock REST API.
 
 This package has zero NPM dependencies.
@@ -46,11 +46,11 @@ If you are looking for something more robust try
 Access tokens are validated by submitting the tokens to the authorization server's /oauth/introspect 
 endpoint. If the token validation succeeds, the token's meta-data is returned. If the token 
 is authorized, the next() handler is called to enable further processing of the authorized request.
-If token validation fails, a status 401 Unauthorized response is returned.
+If token validation fails a status 401 Unauthorized response is returned.
 
 A web page may submit multiple API queries in a short period of time.
 This could result in a series of redundant token validation submissions to the authorization server.
-The program includes a token cache that stores the authorization server meta-data response to a token's
+The program includes a token cache that stores the authorization server meta-data response from a token's
 validation request. When each new HTTP request arrives, the cache is searched for a match to the 
 incoming access token. Cached token meta-data which has not exceeded the tokens expiration 
 times as set by the authorization server, and concurrently the cache entry has not exceeded 
@@ -64,7 +64,8 @@ token which are expired, or tokens which have been in the cache past the tokenCa
 # Credentials
 
 The collab-backend-token-auth middleware requires an Oauth2 client account to grant access 
-to the Oauth2 authorization server in order to submit tokens for validation. 
+to the Oauth2 authorization server in order to submit tokens for validation.
+In this project, they are configured in collab-auth. 
 This consists of clientId and clientSecret values.
 
 # Installation
@@ -98,13 +99,13 @@ The token cache can be disabled by setting tokenCacheSeconds=0.
 ### requireAccessToken(options);
 
 The requireAccessToken() function is the primary nodejs/express middleware 
-that is used to authorize or deny access. This middleware will parse the http 
+that is used to authorize or deny access. This middleware will parse the HTTP 
 authorization header for a bearer token and extract a JWT access token.
 The token is submitted to the authorization server /oauth/introspect endpoint 
 for validation of the digital signature. User related meta-data is returned. 
 Unauthorized requests will generate a status 401 Unauthorized response. 
 Successful requests will call the express next() function. 
-This function will store the token's scope and other user information 
+This function will store the token's scope and user id information 
 in the Express req object for use by other middleware.
 
 The requireAccessToken(options) function will accept an optional options object.
@@ -114,7 +115,7 @@ one of the scopes specified in the options object. The scope value may be either
 a sting or an array of strings.  For example:
 
 ```js
-// Require valid access token, but with any scope restrictions
+// Require valid access token, but without any scope restrictions
 app.use(requireAccessToken()); 
 
 // Require both valid access token and token scope to match api.write
