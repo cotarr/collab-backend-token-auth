@@ -35,7 +35,7 @@ Cached tokens that have not expired are trusted.
 
 ### Changed (Misc)
 
-- When extracting access token from header, verify token is is type 'string' and length greater than 16 and less than 4096.
+- Authorization header maximum length 4096. Exceeding length returns 401 error.
 - In package.json set type: "commonjs"
 - In code, now using Object.hasOwn to test if properties exist in an object, replacing `in` operator, or boolean check on key name.
 - In various places, create new objects with Object.create(null), replacing object literal.

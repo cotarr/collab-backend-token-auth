@@ -163,25 +163,24 @@ const _extractTokenFromHeader = (req, chain) => {
   if (req.headers) {
     if ((Object.hasOwn(req.headers, 'authorization')) &&
       (typeof req.headers.authorization === 'string')) {
-      const authHeaderArray = req.headers.authorization.split(' ');
-      if ((authHeaderArray.length === 2) &&
-        (authHeaderArray[0].toLowerCase() === 'bearer') &&
-        (authHeaderArray[1].length > 0) &&
-        // JWT token "xxxxxx.xxxxxx.xxxxx"
-        (authHeaderArray[1].split('.').length === 3)) {
-        // Typical collab-auth token string length 547 bytes
-        if ((typeof authHeaderArray[1] === 'string') &&
-          (authHeaderArray[1].length > 16) && (authHeaderArray[1].length < 4096)) {
+      // Typical collab-auth token string length 554 bytes
+      if (req.headers.authorization.length < 4096) {
+        const authHeaderArray = req.headers.authorization.split(' ');
+        if ((authHeaderArray.length === 2) &&
+          (authHeaderArray[0].toLowerCase() === 'bearer') &&
+          (authHeaderArray[1].length > 0) &&
+          // JWT token "xxxxxx.xxxxxx.xxxxx"
+          (authHeaderArray[1].split('.').length === 3)) {
           // Input validation succeeded, add Bearer token to chain object
           chain.accessToken = authHeaderArray[1];
           return Promise.resolve(chain);
         } else {
-          const err = new Error('Invalid Bearer token length');
+          const err = new Error('Expected Bearer token');
           err.status = 401;
           return Promise.reject(err);
         }
       } else {
-        const err = new Error('Expected Bearer token');
+        const err = new Error('Authorization header exceeds maximum length');
         err.status = 401;
         return Promise.reject(err);
       }
@@ -192,6 +191,8 @@ const _extractTokenFromHeader = (req, chain) => {
     }
   } else {
     const err = new Error('Headers not found in req object');
+    // Internal server error
+    err.status = 500;
     return Promise.reject(err);
   }
 };
@@ -598,6 +599,7 @@ exports.requireAccessToken = (options) => {
         // Two choices, 401 or 403
         let status = 401;
         if ((err.status) && (err.status === 403)) status = 403;
+        if ((err.status) && (err.status === 500)) status = 500;
         return res.status(status).send(message);
       });
   };
