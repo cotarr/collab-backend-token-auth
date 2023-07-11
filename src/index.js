@@ -129,7 +129,7 @@ const _initChainObject = (options) => {
   }
   // Options parser
   const opt = Object.create(null);
-  if ((options != null) && (Object.hasOwn(options, 'scope'))) {
+  if ((!(options == null)) && (Object.hasOwn(options, 'scope'))) {
     opt.scope = [];
     if ((typeof options.scope === 'string') && (options.scope.length > 0)) {
       opt.scope.push(options.scope);
@@ -223,8 +223,8 @@ const safeCompare = function (token1, token2) {
  * @returns {Promise} Resolved with chain object
  */
 const _findCachedToken = (chain) => {
-  if ((chain != null) &&
-    (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null)) {
+  if ((!(chain == null)) &&
+    (Object.hasOwn(chain, 'accessToken')) && (!(chain.accessToken == null))) {
     // If not cache disabled (seconds = 0), lookup the token
     if (tokenCacheSeconds > 0) {
       const found = tokenCache.find((storedToken) => {
@@ -279,9 +279,9 @@ const _validateToken = (chain) => {
   // console.log(JSON.stringify(chain, null, 2));
   // Unexpired tokens in cache are assumed to be valid.
   // Check for cached token, if valid token from cache, return it.
-  if ((chain != null) &&
+  if ((!(chain == null)) &&
     (Object.hasOwn(chain, 'accessToken')) &&
-    (chain.accessToken != null) && (chain.accessToken.length > 0) &&
+    (!(chain.accessToken == null)) && (chain.accessToken.length > 0) &&
     (Object.hasOwn(chain, 'introspectWasCached')) && (chain.introspectWasCached === true) &&
     (Object.hasOwn(chain, 'introspect')) &&
     (Object.hasOwn(chain.introspect, 'active')) && (chain.introspect.active === true)) {
@@ -373,9 +373,9 @@ const _validateToken = (chain) => {
  * @returns {Promise} Resolved with chain object, or reject with error
  */
 const _checkTokenActive = (chain) => {
-  if ((chain != null) &&
-    (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null) &&
-    (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+  if ((!(chain == null)) &&
+    (Object.hasOwn(chain, 'accessToken')) && (!(chain.accessToken == null)) &&
+    (Object.hasOwn(chain, 'introspect')) && (!(chain.introspect == null)) &&
     (Object.hasOwn(chain.introspect, 'active')) &&
     (chain.introspect.active === true) &&
     (Object.hasOwn(chain.introspect, 'client'))) {
@@ -400,9 +400,9 @@ const _checkTokenActive = (chain) => {
 const _saveTokenToCache = (chain) => {
   // If cache enabled (second != 0), and token not previously cached.
   if (tokenCacheSeconds > 0) {
-    if ((chain != null) &&
-      (Object.hasOwn(chain, 'accessToken')) && (chain.accessToken != null) &&
-      (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+    if ((!(chain == null)) &&
+      (Object.hasOwn(chain, 'accessToken')) && (!(chain.accessToken == null)) &&
+      (Object.hasOwn(chain, 'introspect')) && (!(chain.introspect == null)) &&
       ((!Object.hasOwn(chain, 'introspectWasCached')))) {
       // console.log('saving token to tokenCache');
       tokenCache.push({
@@ -446,8 +446,8 @@ const _saveTokenToCache = (chain) => {
  */
 const _addTokenScopeToReqObject = (req, chain) => {
   if (!Object.hasOwn(req, 'locals')) req.locals = Object.create(null);
-  if ((chain != null) &&
-    (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+  if ((!(chain == null)) &&
+    (Object.hasOwn(chain, 'introspect')) && (!(chain.introspect == null)) &&
     (Object.hasOwn(chain.introspect, 'scope'))) {
     req.locals.tokenScope = chain.introspect.scope || [];
   }
@@ -480,11 +480,11 @@ const _addTokenScopeToReqObject = (req, chain) => {
  */
 const _addUserIdToReqObject = (req, chain) => {
   if (!Object.hasOwn(req, 'locals')) req.locals = Object.create(null);
-  if ((chain != null) &&
-  (Object.hasOwn(chain, 'introspect')) && (chain.introspect != null) &&
+  if ((!(chain == null)) &&
+  (Object.hasOwn(chain, 'introspect')) && (!(chain.introspect == null)) &&
   (Object.hasOwn(chain.introspect, 'user'))) {
     if ((Object.hasOwn(chain.introspect.user, 'number')) &&
-    (chain.introspect.user.number != null) &&
+    (!(chain.introspect.user.number == null)) &&
     (chain.introspect.user.number > 0)) {
       if (!Object.hasOwn(req.locals, 'user')) req.locals.user = Object.create(null);
       req.locals.user.number = parseInt(chain.introspect.user.number);
@@ -493,7 +493,7 @@ const _addUserIdToReqObject = (req, chain) => {
       req.locals.userid = parseInt(chain.introspect.user.number);
     }
     if ((Object.hasOwn(chain.introspect.user, 'id')) &&
-      (chain.introspect.user.id != null) &&
+      (!(chain.introspect.user.id == null)) &&
       (chain.introspect.user.id.length > 0)) {
       if (!Object.hasOwn(req.locals, 'user')) req.locals.user = Object.create(null);
       req.locals.user.id = chain.introspect.user.id;
@@ -514,7 +514,7 @@ const _addUserIdToReqObject = (req, chain) => {
  * @returns {Promise} Resolved with chain object
  */
 const _restrictByScope = (req, chain) => {
-  if ((Object.hasOwn(chain, 'options')) && (chain.options != null) &&
+  if ((Object.hasOwn(chain, 'options')) && (!(chain.options == null)) &&
     (Object.hasOwn(chain.options, 'scope')) &&
     // may be non-empty array or non-empty string
     (chain.options.scope.length > 0)) {
