@@ -8,6 +8,14 @@ and this project adheres to
 
 ## Next
 
+- Removed npm package eslint.
+- Deleted the .eslintrc.js configuration file for eslint.
+- Remove lint command from package.json
+- Delete and regenerate package-lock.json
+- There were no code changes in this commit.
+
+The intent behind removing eslint is to eliminate future GitHub notifications for outdated development dependencies. 
+
 - Update GitHub CodeQL yml config file to version .v3 analysis, previous level deprecated
 
 ## [v2.0.1](https://github.com/cotarr/collab-backend-token-auth/releases/tag/v2.0.1) - 2023-07-11
